@@ -1,6 +1,7 @@
-const tagName = /\b\s*\w*\b/       //标签名
-const space = /\b\s*\b/         //空白符
-const attr_str = /\b(\s*\w*\s*)*\b/   //标签参数
+const tagName = /^\s*\w*/       //标签名
+const space = /^\s*/         //空白符
+const attr_str = /^(\s*\w*\s*=\s*\w\*)*/   //标签参数
+const tabEnd = /^\s*<\/\w*>/   //结束标签
 
 let attrs = makeMap('id,class,style')
 
@@ -19,6 +20,7 @@ function HTMLPraser(html){
     let textEnd = 0
     let lastTab, lastNode           //最新读取到的tab以及对应的节点
     let tabStack = [], topTab                //标签栈以及栈顶节点
+    let tabStart, rest
     while(html){
         if(!lastTab){                   //没有识别到标签时候
             textEnd = html.indexOf('<');
@@ -35,7 +37,7 @@ function HTMLPraser(html){
                 }
                 if(tagName.test(html)){
                     // 获得标签名，生成标签
-                    let tagStart = html.match(space)
+                    tagStart = html.match(space)
                     html = html.substring(tagStart.length)
                     lastTab = html.match(tagName)
                     html = html.substring(lastTab.length)
@@ -50,21 +52,34 @@ function HTMLPraser(html){
                     // 开始标签，就入栈
                     tabStack.push(lastNode)
                 }
+                // 结束标签
+                if(tagEnd.test(html)){
+                    rest = html.match(tabEnd)
+                    html = html.substring(tagEnd.length)
+                    lastTab = rest.match(/\w*/)
+                    if(lastTab === tabStack[tabStack.length - 1]){
+                        tabStack.pop()
+                        lastTab = null
+                        lastNode = null
+                    }
+                }
             }
         // 识别到标签的时候
         }else{
             if(attr_str.test(html)){
-                let attrStart = html.match(attr_str)
+                let attrStart = html.match(attr_str)           //匹配到key = value形式
                 html = html.substring(attrStart.length)
-                attrStart.trim()
-                
+                let attrAndVal = attrStart.split(/\s+/)            //0： key， 1： =， 2： val
+                lastNode.setAttribute(attrAndVal[0], attrAndVal[2])  //设置属性
             }
-            if(/>/.test(html)){
+            if(/^\s*>/.test(html)){
                 tagEnd = html.indexOf()
                 lastTab = null
-            }else if(/\/>/.test(html)){
+                lastNode = null
+            }else if(/^\s*\/>/.test(html)){
                 if(tabStack[tabStack.length - 1] === lastTab){
                     lastTab = null
+                    lastNode = null
                     tabStack.pop()
                 }
                 else return
